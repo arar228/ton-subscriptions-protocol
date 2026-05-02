@@ -1,0 +1,43 @@
+name: ci
+
+on:
+  push:
+    branches: [main, master]
+  pull_request:
+    branches: [main, master]
+
+jobs:
+  build-and-test:
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup Node 20
+        uses: actions/setup-node@v4
+        with:
+          node-version: 20
+          cache: npm
+
+      - name: Install
+        run: npm ci
+
+      - name: Compile contracts (Tolk + FunC)
+        run: npx blueprint build --all
+
+      - name: Run test suite (36 tests, incl. real Tether USDT)
+        run: npx jest --ci --reporters=default
+        env:
+          NODE_OPTIONS: --max-old-space-size=4096
+
+      - name: Persist compiled BOC artefacts
+        if: success()
+        uses: actions/upload-artifact@v4
+        with:
+          name: compiled-contracts
+          path: |
+            build/Channel.compiled.json
+            build/Registry.compiled.json
+          retention-days: 30
