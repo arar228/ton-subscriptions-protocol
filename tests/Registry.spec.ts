@@ -47,7 +47,7 @@ describe('SubscriptionRegistry', () => {
             value: toNano('0.3'),
             creator: env.creator.address,
             jettonMaster: null,
-            period: 60,                       // 1 minute — too low
+            period: 30,                       // < MIN_PERIOD (60s in dev build)
             amount: AMOUNT_TON,
             relayerBounty: RELAYER_BOUNTY,
         })

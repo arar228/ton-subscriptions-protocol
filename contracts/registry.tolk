@@ -16,7 +16,7 @@ const ERR_FEE_TOO_HIGH:     int = 413;
 const ERR_BOUNTY_TOO_LOW:   int = 414;
 const ERR_UNKNOWN_OP:       int = 0xffff;
 
-const MIN_PERIOD:           int = 3600;
+const MIN_PERIOD:           int = 60;          // FIXME: testnet/dev — поднять до 3600 перед mainnet
 const MAX_PERIOD:           int = 365 * 86400;
 const MAX_FEE_BPS:          int = 1000;
 // Калибровано под реальный TEP-74 (USDT Tether on TON):
