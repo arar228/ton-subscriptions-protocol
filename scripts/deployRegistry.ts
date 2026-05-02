@@ -28,14 +28,16 @@ export async function run(provider: NetworkProvider) {
     ui.write(`Fee (bps):      ${PROTOCOL_FEE_BPS} (=${PROTOCOL_FEE_BPS / 100}%)`)
     ui.write('────────────────────────────────────────────────')
 
-    const confirm = await ui.choose(
-        'Deploy with these params?',
-        ['Yes, deploy', 'Abort'],
-        (s) => s,
-    )
-    if (confirm !== 'Yes, deploy') {
-        ui.write('Aborted.')
-        return
+    if (process.env.AUTO_CONFIRM !== '1') {
+        const confirm = await ui.choose(
+            'Deploy with these params?',
+            ['Yes, deploy', 'Abort'],
+            (s) => s,
+        )
+        if (confirm !== 'Yes, deploy') {
+            ui.write('Aborted.')
+            return
+        }
     }
 
     const channelCode  = await compile('Channel')
