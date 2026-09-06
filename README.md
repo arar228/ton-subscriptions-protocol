@@ -1,12 +1,28 @@
 # TON Subscriptions Protocol
 
-> Recurring payments on TON — "Stripe for Web3". Self-custodial subscription channels for native TON and Jetton (USDT) auto-debits.
+Recurring-payment smart contracts for TON and Jetton assets. A contract-engineering case study in explicit state transitions, asynchronous transfers, and reproducible integration tests.
 
-[![CI](https://github.com/USER/REPO/actions/workflows/ci.yml/badge.svg)](../../actions/workflows/ci.yml)
+[![CI](https://github.com/arar228/ton-subscriptions-protocol/actions/workflows/ci.yml/badge.svg?branch=master)](https://github.com/arar228/ton-subscriptions-protocol/actions/workflows/ci.yml)
 [![License: Apache 2.0](https://img.shields.io/badge/License-Apache_2.0-blue.svg)](LICENSE)
 [![Tolk 1.3](https://img.shields.io/badge/Tolk-1.3-green.svg)](https://github.com/ton-blockchain/tolk-js)
 
-This repository contains the **smart contracts** of the protocol. The relayer / indexer / Telegram Mini App are operated separately as a hosted SaaS — but you're free to run your own thanks to the open contract layer.
+This public repository contains the **contract layer**: Tolk contracts, TypeScript wrappers, deployment scripts, and 36 sandbox tests. Relayer, indexer, and Telegram Mini App implementations are maintained separately and are outside this repository's review scope.
+
+**Start here:** [Architecture](#architecture) · [Run locally](#quick-start) · [Tests](#test-coverage-36-tests) · [Security](#security)
+
+## Engineering review guide
+
+Subscribers pre-fund a channel; an external caller triggers each due payment. The engineering challenge is preserving billing and balance state across delayed messages, user actions, and failed transfers.
+
+| Decision | Implementation and evidence |
+|---|---|
+| Separate shared configuration from per-subscription state | [Registry contract](contracts/registry.tolk), [channel contract](contracts/channel.tolk), and [registry tests](tests/Registry.spec.ts) |
+| Validate billing time and reject repeated processing | [Channel tests](tests/Channel.spec.ts) cover early and duplicate calls, pause/resume, cancellation, and getters |
+| Restore accounting state when a Jetton transfer bounces | [Bounce tests](tests/ChannelJettonBounce.spec.ts) use a controllable wallet to exercise rollback and recovery |
+| Exercise integration against a concrete token implementation | [Tether integration tests](tests/ChannelRealUSDT.spec.ts) compile vendored contracts and run mint, transfer, charge distribution, and refund flows in TON Sandbox |
+| Keep verification reproducible | [CI workflow](.github/workflows/ci.yml) installs the lockfile, compiles contracts, runs Jest, and uploads compiled artifacts |
+
+**Status:** the public code supports local compilation and sandbox evaluation. A formal security audit is required before mainnet deployment with real user funds; see [Security](#security).
 
 ## Architecture
 
@@ -29,24 +45,28 @@ SubscriptionChannel (per user↔creator↔asset, deterministic address)
 
 ## Quick start
 
+The [CI environment](.github/workflows/ci.yml) currently uses Node.js 20. Local compilation and all 36 sandbox tests were also verified with Node.js 22.17.0 on 2026-09-06.
+
 ```bash
-git clone https://github.com/USER/REPO.git
-cd REPO
-npm install
-npx blueprint build --all
-npx jest                    # 36/36 should pass
+git clone https://github.com/arar228/ton-subscriptions-protocol.git
+cd ton-subscriptions-protocol
+npm ci
+npm run build
+npm test -- --runInBand
 ```
+
+The test suite creates an in-memory blockchain with `@ton/sandbox`. Wallet credentials, RPC access, and real funds are not required. The deployment scripts below are a separate, explicit workflow.
 
 ## Test coverage (36 tests)
 
 | Suite | Count | What it verifies |
 |---|---|---|
-| `Registry.spec.ts` | 9 | Config update, deterministic channel address, deploy validation (period/amount/bounty bounds) |
-| `Channel.spec.ts` | 16 | TON-mode happy path, double-process rejection, pause/resume remainder, cancel refund, getter consistency |
-| `ChannelJettonBounce.spec.ts` | 7 | TOFU JW-bind, spoofed-notify rejection, **state rollback on Jetton bounce** (the critical one) |
-| `ChannelRealUSDT.spec.ts` | 4 | Integration vs **real Tether `stablecoin-contract`** — real mint, real transfer, real charge distribution |
+| [Registry.spec.ts](tests/Registry.spec.ts) | 9 | Config update, deterministic channel address, deploy validation (period/amount/bounty bounds) |
+| [Channel.spec.ts](tests/Channel.spec.ts) | 16 | TON-mode happy path, double-process rejection, pause/resume remainder, cancel refund, getter consistency |
+| [ChannelJettonBounce.spec.ts](tests/ChannelJettonBounce.spec.ts) | 7 | TOFU JW-bind, spoofed-notify rejection, state rollback on Jetton bounce |
+| [ChannelRealUSDT.spec.ts](tests/ChannelRealUSDT.spec.ts) | 4 | Vendored Tether `stablecoin-contract` integration: sandbox mint, transfer, charge distribution, and refund |
 
-The Tether code under `contracts/jetton-tether/` is a vendored shallow-clone of [ton-blockchain/stablecoin-contract](https://github.com/ton-blockchain/stablecoin-contract); compiled hash matches the production USDT minter on TON mainnet.
+The Tether code under [`contracts/jetton-tether/`](contracts/jetton-tether/) is vendored from [ton-blockchain/stablecoin-contract](https://github.com/ton-blockchain/stablecoin-contract). These tests use that implementation inside the sandbox; they do not execute mainnet payments or establish production security. Its upstream audit concerns the vendored token implementation, not this subscription protocol.
 
 ## Deploy
 
